@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def hello():
-    return "Hello World!"
+    return "Hello World!\n"
 
 @app.route('/getjson')
 def getjson():
@@ -22,7 +22,7 @@ def saveget():
     if request.method=='GET':
        a=request.args.get('name', '')
        b=request.args.get('email', '')
-       return "Name : "+a+" ,  Email :  "+b
+       return "Name : "+a+" ,  Email :  "+b+"\n"
     else:
         return "Not get method"
 
@@ -32,7 +32,7 @@ def savepost():
     if request.method=='POST':
        a=request.form['name']
        b=request.form['email']
-       return "Name :  "+a+"  Email:  "+b
+       return "Name :  "+a+"  Email:  "+b+"\n"
     else:
         return "error"
 
