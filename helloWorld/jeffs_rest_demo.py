@@ -85,32 +85,46 @@ if not path.exists(DATABASE_FILENAME):
 app = Flask(__name__)
 
 api = ApiV1()
-@app.route("/v1/", methods=["POST", "PUT", "DELETE"])
-@app.route("/v1/<name>", methods=["GET"]  )
-def v1_api(name):
+
+# By default, if no methods are specified, then GET and HEAD are accepted and
+# nothing else
+@app.route("/v1/")
+def v1_api_get0():
+    # Come here if the URL is of the form /v1/?name=jeffs
+    # request is an instance of flask.Request, see
+    # https://flask.palletsprojects.com/en/2.0.x/api/#flask.Request
+    args: datastructures.ImmutableMultiDict = request.args
+    print(f"in v1_api_get0: args is {args}")
+    name = args['name']
+    # This is a stop gap.  Think a little more about how to return a result
+    return v1_api_get1(name)
+
+@app.route("/v1/<name>" )
+def v1_api_get1(name):
     """This method handles API version 1 calls"""
     global database
     if len(database) == 0:
         load_database()
-    # request is an instance of flask.Request, see
-    # https://flask.palletsprojects.com/en/2.0.x/api/#flask.Request
+    print(f"GET method: name={name} value={database.get(name, 'NOT FOUND!')}")
+    result = api.get(name)
+    # In a future version, this will be MIME type sensitive
+    json_string = json.dumps({"name": name, "email": result}) + "\n"
+    return json_string
+
+@app.route("/v1/", methods = ['POST','PUT','DELETE'])
+def v1_apt_not_get():
+    name = request.form['name']
     args: datastructures.ImmutableMultiDict = request.args
-    print(f"The method is {request.method}")
-    if request.method == 'GET':
-        print(f"GET method: name={name} value={database.get(name, 'NOT FOUND!')}")
-        result = api.get(name)
-    else:
-        name = request.form['name']
-        print(f"method is {request.method}. name={name} and type={type(name)}")
-        if request.method == 'POST':
-            result = api.post(name=name, addr=args.get('email', default=None, type=None))
-        elif request.method == 'PUT':
-            result = api.post(name=name, addr=args.get('email', default=None, type=None))
-        elif request.method == 'DELETE':
-            result = api.delete(name=name)
-        else:   # Not sure how this can happen
-            result = None       # Result must be something
-            raise MethodNotAllowed
+    print(f"method is {request.method}. name={name} and type={type(name)}")
+    if request.method == 'POST':
+        result = api.post(name=name, addr=args.get('email', default=None, type=None))
+    elif request.method == 'PUT':
+        result = api.post(name=name, addr=args.get('email', default=None, type=None))
+    elif request.method == 'DELETE':
+        result = api.delete(name=name)
+    else:   # Not sure how this can happen
+        result = None       # Result must be something
+        raise MethodNotAllowed
     json_string = json.dumps({"name": name, "email": result}) + "\n"
     return json_string
 
