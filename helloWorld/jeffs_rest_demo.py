@@ -32,7 +32,6 @@ from os import path
 DATABASE_FILENAME = "address_list.json"
 database = {}
 
-
 def load_database() -> None:
     global database
     with open(DATABASE_FILENAME, "r") as dbf:
@@ -50,27 +49,32 @@ class ApiV1(object):
     Undisturbed REST: a guide to designing the perfect API
     by Michael Stowe"""
 
+    global database
+
     def __init__(self):
         load_database()
 
-    def get(name: str) -> str:
+    def get(self, name: str) -> str:
+        print(
+            f"in get(): name={name} value={database.get(name, 'NOT FOUND!')}, {name in database}")
         if name not in database:
+            print(f"What's in the database? {database}")
             raise NotFound
         return database[name]
 
 
-    def post(name: str, email: str) -> None:
+    def post(self, name: str, email: str) -> None:
         if name in database:
             raise Conflict
         database[name] = email
         save_database()
 
-    def put(name: str, email: str) -> None:
+    def put(self, name: str, email: str) -> None:
         database[name] = email
         save_database()
 
 
-    def delete(name: str) -> None:
+    def delete(self, name: str) -> None:
         if name in database:
             del database[name]
 
@@ -81,9 +85,9 @@ if not path.exists(DATABASE_FILENAME):
 app = Flask(__name__)
 
 api = ApiV1()
-
-@app.route("/v1", methods=["GET", "POST", "PUT", "DELETE"])
-def v1_api():
+@app.route("/v1/", methods=["POST", "PUT", "DELETE"])
+@app.route("/v1/<name>", methods=["GET"]  )
+def v1_api(name):
     """This method handles API version 1 calls"""
     global database
     if len(database) == 0:
@@ -91,20 +95,23 @@ def v1_api():
     # request is an instance of flask.Request, see
     # https://flask.palletsprojects.com/en/2.0.x/api/#flask.Request
     args: datastructures.ImmutableMultiDict = request.args
-    name = args.get('name', default=None, type=None)
-    print(f"name is {name} and is type {type(name)}", file=sys.stderr)
+    print(f"The method is {request.method}")
     if request.method == 'GET':
-        result = api.get(name=name)
-    elif request.method == 'POST':
-        result = api.post(name=name, addr=args.get('email', default=None, type=None))
-    elif request.method == 'PUT':
-        result = api.post(name=name, addr=args.get('email', default=None, type=None))
-    elif request.method == 'DELETE':
-        result = api.delete(name=name)
+        print(f"GET method: name={name} value={database.get(name, 'NOT FOUND!')}")
+        result = api.get(name)
     else:
-        result = None       # Result must be something
-        raise MethodNotAllowed
-    json_string = json.dumps({"name": name, "email": result})
+        name = request.form['name']
+        print(f"method is {request.method}. name={name} and type={type(name)}")
+        if request.method == 'POST':
+            result = api.post(name=name, addr=args.get('email', default=None, type=None))
+        elif request.method == 'PUT':
+            result = api.post(name=name, addr=args.get('email', default=None, type=None))
+        elif request.method == 'DELETE':
+            result = api.delete(name=name)
+        else:   # Not sure how this can happen
+            result = None       # Result must be something
+            raise MethodNotAllowed
+    json_string = json.dumps({"name": name, "email": result}) + "\n"
     return json_string
 
 
