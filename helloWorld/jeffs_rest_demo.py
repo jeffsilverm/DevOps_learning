@@ -17,31 +17,21 @@
 #
 #
 #
-# From https://python.plainenglish.io/create-a-simple-rest-api-using-python-flask-framework-1d8b491af648
+# From https://python.plainenglish.io/create-a-simple-rest-api-using-python
+# -flask-framework-1d8b491af648    # noqa
 
-import sys
+
+import json
+from os import path
 
 from flask import Flask
 from flask import json
 from flask import request
 from werkzeug import datastructures
 from werkzeug.exceptions import MethodNotAllowed, Conflict, NotFound
-import json
-from os import path
 
-DATABASE_FILENAME = "address_list.json"
-database = {}
+from tests.test_get import DATABASE_FILENAME
 
-def load_database() -> None:
-    global database
-    with open(DATABASE_FILENAME, "r") as dbf:
-        database = json.load(dbf)
-
-
-def save_database() -> None:
-    global database
-    with open(DATABASE_FILENAME, "w") as dbf:
-        json.dump(obj=database, fp=dbf)
 
 class ApiV1(object):
     """This class implements version 1 of the API.  Implementing the API
@@ -49,42 +39,52 @@ class ApiV1(object):
     Undisturbed REST: a guide to designing the perfect API
     by Michael Stowe"""
 
-    global database
-
     def __init__(self):
-        load_database()
+        if not path.exists(DATABASE_FILENAME):
+            # If the database file does not exist, then create it.
+            self.database = {"jeff": "jeffsilverm@gmail.com",
+                             "jeffs": "jeffsilverman.924@gmail.com"}
+            self.save_database()
+        else:
+            self.load_database()
+
+    def load_database(self) -> None:
+        with open(DATABASE_FILENAME, "r") as dbf:
+            self.database = json.load(dbf)
+
+    def save_database(self) -> None:
+        with open(DATABASE_FILENAME, "w") as dbf:
+            json.dump(obj=self.database, fp=dbf)
 
     def get(self, name: str) -> str:
         print(
-            f"in get(): name={name} value={database.get(name, 'NOT FOUND!')}, {name in database}")
-        if name not in database:
-            print(f"What's in the database? {database}")
+            f"in get(): name={name} value="
+            f"{self.database.get(name, 'NOT FOUND!')}, "
+            f"{name in self.database}")
+        if name not in self.database:
+            print(f"What's in the database? {self.database}")
             raise NotFound
-        return database[name]
-
+        return self.database[name]
 
     def post(self, name: str, email: str) -> None:
-        if name in database:
+        if name in self.database:
             raise Conflict
-        database[name] = email
-        save_database()
+        self.database[name] = email
+        self.save_database()
 
     def put(self, name: str, email: str) -> None:
-        database[name] = email
-        save_database()
-
+        self.database[name] = email
+        self.save_database()
 
     def delete(self, name: str) -> None:
-        if name in database:
-            del database[name]
+        if name in self.database:
+            del self.database[name]
 
-if not path.exists(DATABASE_FILENAME):
-    # If the database file does not exist, then create it as an empty JSON file
-    save_database()
 
 app = Flask(__name__)
 
 api = ApiV1()
+
 
 # By default, if no methods are specified, then GET and HEAD are accepted and
 # nothing else
@@ -96,34 +96,38 @@ def v1_api_get0():
     args: datastructures.ImmutableMultiDict = request.args
     print(f"in v1_api_get0: args is {args}")
     name = args['name']
-    # This is a stop gap.  Think a little more about how to return a result
     return v1_api_get1(name)
 
-@app.route("/v1/<name>" )
+
+@app.route("/v1/<name>")
 def v1_api_get1(name):
     """This method handles API version 1 calls"""
-    global database
-    if len(database) == 0:
-        load_database()
-    print(f"GET method: name={name} value={database.get(name, 'NOT FOUND!')}")
-    result = api.get(name)
-    # In a future version, this will be MIME type sensitive
-    json_string = json.dumps({"name": name, "email": result}) + "\n"
-    return json_string
+    if len(api.database) == 0:
+        api.load_database()
+    assert isinstance(api.database, dict), "api.database should be a dict, " \
+                                           f"but it's actually a " \
+                                           f"{type(api.database)}"
+    print(f"GET method: name={name} value={api.database.get(name, 'NOT FOUND!')}")
+    # Converting result to a JSON style string is a stopgap measure.  This
+    # should be type sensitive
+    result = {name: api.get(name)}
+    return result
 
-@app.route("/v1/", methods = ['POST','PUT','DELETE'])
+
+@app.route("/v1/", methods=['POST', 'PUT', 'DELETE'])
 def v1_apt_not_get():
     name = request.form['name']
     args: datastructures.ImmutableMultiDict = request.args
     print(f"method is {request.method}. name={name} and type={type(name)}")
     if request.method == 'POST':
-        result = api.post(name=name, addr=args.get('email', default=None, type=None))
+        result = api.post(name=name,
+                          addr=args.get('email', default=None, type=None))
     elif request.method == 'PUT':
-        result = api.post(name=name, addr=args.get('email', default=None, type=None))
+        result = api.post(name=name,
+                          addr=args.get('email', default=None, type=None))
     elif request.method == 'DELETE':
         result = api.delete(name=name)
-    else:   # Not sure how this can happen
-        result = None       # Result must be something
+    else:  # Not sure how this can happen
         raise MethodNotAllowed
     json_string = json.dumps({"name": name, "email": result}) + "\n"
     return json_string
